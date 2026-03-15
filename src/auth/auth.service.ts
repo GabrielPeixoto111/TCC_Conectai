@@ -1,10 +1,16 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { UpdateUserPatchDto } from './dto/updateuserpatch.dto';
+import { UpdateUserPutDto } from './dto/updateuser.put.dto';
 
 @Injectable()
 export class AuthService {
@@ -17,7 +23,10 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto): Promise<AuthResponseDto> {
     // Hash da senha
-    const hashedPassword = await bcrypt.hash(createUserDto.password, this.SALT_ROUNDS);
+    const hashedPassword = await bcrypt.hash(
+      createUserDto.password,
+      this.SALT_ROUNDS,
+    );
 
     // Criar usuário com a senha criptografada
     const user = await this.usersService.create({
@@ -36,6 +45,7 @@ export class AuthService {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
+        bio: user.bio,
       },
     };
   }
@@ -48,7 +58,10 @@ export class AuthService {
     }
 
     // Validar senha
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email ou senha incorretos');
@@ -69,7 +82,91 @@ export class AuthService {
         username: user.username,
         firstName: user.firstName,
         lastName: user.lastName,
+        bio: user.bio,
       },
+    };
+  }
+
+  async updateUserPatch(
+    id: string,
+    updateUserPatchDto: UpdateUserPatchDto,
+  ): Promise<AuthResponseDto> {
+    const user = await this.usersService.findById(id);
+
+    if (!user) {
+      throw new BadRequestException('Usuário não encontrado');
+    }
+
+    // Se estiver atualizando senha, precisa criptografar
+    if (updateUserPatchDto.password) {
+      updateUserPatchDto.password = await bcrypt.hash(
+        updateUserPatchDto.password,
+        this.SALT_ROUNDS,
+      );
+    }
+
+    const updatedUser = await this.usersService.update(id, updateUserPatchDto);
+
+    const access_token = this.generateToken(updatedUser);
+
+    return {
+      access_token,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        bio: updatedUser.bio,
+      },
+    };
+  }
+
+  async updateUserPut(
+    id: string,
+    updateUserPutDto: UpdateUserPutDto,
+  ): Promise<AuthResponseDto> {
+    const user = await this.usersService.findById(id);
+
+    if (!user) {
+      throw new BadRequestException('Usuário não encontrado');
+    }
+
+    if (updateUserPutDto.password) {
+      updateUserPutDto.password = await bcrypt.hash(
+        updateUserPutDto.password,
+        this.SALT_ROUNDS,
+      );
+    }
+
+    const updatedUser = await this.usersService.update(id, updateUserPutDto);
+
+    const access_token = this.generateToken(user);
+
+    return {
+      access_token,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        username: updatedUser.username,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        bio: updatedUser.bio,
+      },
+    };
+  }
+
+  async deleteUser(id: string) {
+    const user = await this.usersService.findById(id);
+
+    if (!user) {
+      throw new BadRequestException('Usuário não encontrado');
+    }
+
+    await this.usersService.delete(id);
+
+    return {
+      message: 'Usuário deletado com sucesso',
     };
   }
 

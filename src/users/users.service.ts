@@ -43,4 +43,20 @@ export class UsersService {
   async findByUsername(username: string): Promise<User | null> {
     return this.userRepository.findOne({ where: { username } });
   }
+
+  async update(id: string, updateUserDto: any): Promise<User> {
+    const user = await this.findById(id);
+
+    if (!user) {
+      throw new ConflictException('Usuário não encontrado');
+    }
+
+    Object.assign(user, updateUserDto);
+
+    return this.userRepository.save(user);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.userRepository.delete(id);
+  }
 }
